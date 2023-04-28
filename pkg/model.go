@@ -24,11 +24,12 @@ type Model struct {
 	textarea      textarea.Model
 	agentTextarea textarea.Model
 
-	senderStyle  lipgloss.Style
-	agentStyle   lipgloss.Style
-	aiStyle      lipgloss.Style
-	backendStyle lipgloss.Style
-	thoughtStyle lipgloss.Style
+	senderStyle      lipgloss.Style
+	agentStyle       lipgloss.Style
+	aiStyle          lipgloss.Style
+	backendStyle     lipgloss.Style
+	thoughtStyle     lipgloss.Style
+	observationStyle lipgloss.Style
 
 	err error
 	gr  *glamour.TermRenderer
@@ -36,7 +37,7 @@ type Model struct {
 
 func InitialModel(messageChan chan MessageContext, backendChan chan MessageContext) Model {
 	ta := textarea.New()
-	ta.Placeholder = "Send a user message..."
+	ta.Placeholder = "Send a user message... [TAB] to switch to agent mode"
 	ta.Focus()
 	ta.Prompt = "┃ "
 	ta.CharLimit = 280
@@ -47,7 +48,7 @@ func InitialModel(messageChan chan MessageContext, backendChan chan MessageConte
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	ata := textarea.New()
-	ata.Placeholder = "Send an agent message..."
+	ata.Placeholder = "Send an agent message... [TAB] to switch to user mode"
 	ata.Prompt = "┃ "
 	ata.CharLimit = 280
 	ata.SetWidth(VIEW_WIDTH)
@@ -83,6 +84,7 @@ func InitialModel(messageChan chan MessageContext, backendChan chan MessageConte
 		aiStyle:          lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 		backendStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
 		thoughtStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("4")),
+		observationStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
 		err:              nil,
 		gr:               renderer,
 	}
@@ -152,6 +154,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.err = msg
 		return m, nil
+	case Message:
+		log.Printf("Processing message: %v", msg)
+		m.messages = append(m.messages, msg)
+		m.messageChan <- MessageContext{
+			Current: msg,
+			History: m.messages,
+		}
+		m.backendChan <- MessageContext{
+			Current: msg,
+			History: m.messages,
+		}
+		m.internalViewport.SetContent(m.internalContent())
+		m.internalViewport.GotoBottom()
+		m.viewport.SetContent(m.messageContent())
+		m.viewport.GotoBottom()
 	case Messages:
 		log.Printf("Received messages: %v", msg)
 		for _, a := range msg {
@@ -170,37 +187,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.internalViewport.GotoBottom()
 		m.viewport.SetContent(m.messageContent())
 		m.viewport.GotoBottom()
-	case AIMsg:
-		outMsg := Message{
-			Sender: "AI",
-			Text:   msg.text,
-		}
-		m.messages = append(m.messages, outMsg)
-		m.backendChan <- MessageContext{
-			Current: outMsg,
-			History: m.messages,
-		}
-		m.internalViewport.SetContent(m.internalContent())
-		m.internalViewport.GotoBottom()
-	case BackendMsg:
-		outMsg := Message{
-			Sender: "Backend",
-			Text:   msg.text,
-		}
-		m.messages = append(m.messages, outMsg)
-		m.messageChan <- MessageContext{
-			Current: outMsg,
-			History: m.messages,
-		}
-		m.internalViewport.SetContent(m.internalContent())
-		m.internalViewport.GotoBottom()
-	case AgentMsg:
-		m.messages = append(m.messages, Message{
-			Sender: "Agent",
-			Text:   msg.text,
-		})
-		m.viewport.SetContent(m.messageContent())
-		m.viewport.GotoBottom()
+		// case AIMsg:
+		// 	outMsg := Message{
+		// 		Sender: "AI",
+		// 		Text:   msg.text,
+		// 	}
+		// 	m.messages = append(m.messages, outMsg)
+		// 	m.backendChan <- MessageContext{
+		// 		Current: outMsg,
+		// 		History: m.messages,
+		// 	}
+		// 	m.internalViewport.SetContent(m.internalContent())
+		// 	m.internalViewport.GotoBottom()
+		// case BackendMsg:
+		// 	outMsg := Message{
+		// 		Sender: "Backend",
+		// 		Text:   msg.text,
+		// 	}
+		// 	m.messages = append(m.messages, outMsg)
+		// 	m.messageChan <- MessageContext{
+		// 		Current: outMsg,
+		// 		History: m.messages,
+		// 	}
+		// 	m.internalViewport.SetContent(m.internalContent())
+		// 	m.internalViewport.GotoBottom()
+		// case AgentMsg:
+		// 	m.messages = append(m.messages, Message{
+		// 		Sender: "Agent",
+		// 		Text:   msg.text,
+		// 	})
+		// 	m.viewport.SetContent(m.messageContent())
+		// 	m.viewport.GotoBottom()
 	}
 
 	// log.Printf("Model.Returning:\n\t%#v\n\t%#v\n\t%#v", tiCmd, vpCmd, ivpCmd)
@@ -273,13 +290,10 @@ func (m Model) internalContent() string {
 			sb.WriteString(wordwrap.String(ssb.String(), VIEW_WIDTH))
 		} else if msg.Sender == "Backend" {
 			var ssb strings.Builder
-			ssb.WriteString(m.backendStyle.Render("Observation"))
+			ssb.WriteString(m.observationStyle.Render("Observation"))
 			ssb.WriteString(": ")
-			str, err := m.gr.Render(msg.Text)
-			if err != nil {
-				ssb.WriteString("error rendering message")
-			}
-			ssb.WriteString(str)
+			ssb.WriteString(msg.Text)
+			ssb.WriteString("\n")
 
 			sb.WriteString(wordwrap.String(ssb.String(), VIEW_WIDTH))
 		} else if msg.Sender == "Thought" {

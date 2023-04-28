@@ -77,7 +77,7 @@ func (a *Backend) Chat(msg Message) {
 
 	switch action {
 	case "Chat":
-		a.program.Send(AgentMsg{text: input})
+		a.program.Send(Message{Sender: "Agent", Text: input})
 	case "OrderSearch":
 		if input == "jpozdena@gmail.com" {
 			orderJson, err := json.MarshalIndent(orderResults{
@@ -90,24 +90,10 @@ func (a *Backend) Chat(msg Message) {
 				return
 			}
 
-			a.program.Send(BackendMsg{text: string(orderJson)})
+			a.program.Send(Message{Sender: "Backend", Text: string(orderJson)})
 
 			return
-		}
-
-		orderJson, err := json.MarshalIndent(orderResults{
-			ResultsFor: "lookup_orders_by_email",
-			LookupBy:   input,
-			Orders:     []order{},
-		}, "", "  ")
-		if err != nil {
-			a.program.Send(errMsg(err))
-			return
-		}
-
-		a.program.Send(BackendMsg{text: string(orderJson)})
-	case "lookup_orders_by_phone_number":
-		if input == "5033480170" {
+		} else if input == "5033480170" {
 			orderJson, err := json.MarshalIndent(orderResults{
 				ResultsFor: "lookup_orders_by_phone_number",
 				LookupBy:   input,
@@ -118,23 +104,11 @@ func (a *Backend) Chat(msg Message) {
 				return
 			}
 
-			a.program.Send(BackendMsg{text: string(orderJson)})
+			a.program.Send(Message{Sender: "Backend", Text: string(orderJson)})
 
 			return
 		}
 
-		orderJson, err := json.MarshalIndent(orderResults{
-			ResultsFor: "lookup_orders_by_phone_number",
-			LookupBy:   input,
-			Orders:     []order{},
-		}, "", "  ")
-		if err != nil {
-			a.program.Send(errMsg(err))
-			return
-		}
-
-		a.program.Send(BackendMsg{text: string(orderJson)})
-	case "lookup_order_by_order_number":
 		for _, o := range orders {
 			if o.OrderNumber == input {
 				orderJson, err := json.MarshalIndent(orderResults{
@@ -147,19 +121,36 @@ func (a *Backend) Chat(msg Message) {
 					return
 				}
 
-				a.program.Send(BackendMsg{text: string(orderJson)})
+				a.program.Send(Message{Sender: "Backend", Text: string(orderJson)})
 				return
 			}
 		}
-	case "ReturnOrderFlow":
-		if input == "123456" {
-			a.program.Send(BackendMsg{text: fmt.Sprintf(`Retrun instructions sent for order %s`, input)})
+
+		orderJson, err := json.MarshalIndent(orderResults{
+			ResultsFor: "lookup_orders_by_email",
+			LookupBy:   input,
+			Orders:     []order{},
+		}, "", "  ")
+		if err != nil {
+			a.program.Send(errMsg(err))
 			return
 		}
-		a.program.Send(BackendMsg{text: fmt.Sprintf(`Invalid order number: %s`, input)})
+
+		a.program.Send(Message{Sender: "Backend", Text: string(orderJson)})
+	case "ReturnOrderFlow":
+		if input == "123456" {
+			a.program.Send(
+				Messages{
+					Message{Sender: "Backend", Text: fmt.Sprintf("Retrun instructions sent for order %s", input)},
+					Message{Sender: "Agent", Text: fmt.Sprintf("Return instructions have been sent for %s. The should be in your email inbox within the hour", input)},
+				},
+			)
+			return
+		}
+		a.program.Send(Message{Sender: "Backend", Text: fmt.Sprintf(`Invalid order number: %s`, input)})
 	case "CloseConversation":
-		a.program.Send(AgentMsg{text: "Goodbye"})
+		a.program.Send(Message{Sender: "Agent", Text: "Goodbye"})
 	case "EscalateToHuman":
-		a.program.Send(AgentMsg{text: "I'll transfer you to a human agent"})
+		a.program.Send(Message{Sender: "Agent", Text: "I'll transfer you to a human agent"})
 	}
 }

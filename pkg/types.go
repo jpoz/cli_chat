@@ -2,11 +2,11 @@ package clichat
 
 type (
 	errMsg error
-
-	AIMsg      struct{ text string }
-	AgentMsg   struct{ text string }
-	BackendMsg struct{ text string }
-
+	//
+	// AIMsg      struct{ text string }
+	// AgentMsg   struct{ text string }
+	// BackendMsg struct{ text string }
+	//
 	Message struct {
 		Sender string
 		Text   string
